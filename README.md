@@ -27,6 +27,7 @@ python3 -m pipeline.load_all    # Phase 1: Load raw data into SQLite
 python3 -m pipeline.sites       # Phase 2: Build site hierarchy and cycle trails
 python3 -m pipeline.cycles      # Phase 3: Assemble canonical cycle model
 python3 -m analytics.pnl        # Phase 4: Compute P&L, hedge gains, anomalies
+streamlit run dashboard/app.py  # Phase 5: Launch the Streamlit dashboard
 ```
 
 ## Run tests
@@ -35,7 +36,7 @@ python3 -m analytics.pnl        # Phase 4: Compute P&L, hedge gains, anomalies
 python3 -m pytest tests/ -v
 ```
 
-28 tests across 4 phases (4 + 4 + 6 + 14).
+36 tests across 5 phases (4 + 4 + 6 + 14 + 8).
 
 ## Phase 4 results
 
@@ -50,7 +51,7 @@ python3 -m pytest tests/ -v
 
 - `pipeline/` -- data ingestion and transformation (Phases 1-3)
 - `analytics/` -- P&L engine and metrics (Phase 4)
-- `dashboard/` -- Streamlit app (Phase 5, in progress)
+- `dashboard/` -- Streamlit app (Phase 5): `app.py` + `helpers.py`
 - `data/raw/` -- source files (do not edit)
 - `data/processed/` -- generated SQLite database
 - `tests/` -- smoke tests per phase
