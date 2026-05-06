@@ -1,27 +1,56 @@
-# ProAg Track 2 — Producer Analytics
+# ProAg Track 2 -- Producer Analytics
 
-A tool for ProAg advisors to centralize producer data and generate AI-assisted insights.
+A tool for ProAg advisors to centralize hog producer data and generate AI-assisted insights. Built for the Spring 2026 AI & Analytics Innovation Challenge.
+
+## Team
+
+| Name | Focus |
+|------|-------|
+| Jayesh Sawarkar | Analytics & AI |
+| Praveer Byndoor | Data Pipeline & Architecture |
+| Roshni More | Dashboard & UX |
+
+Faculty Mentor: Professor Chris Dunham, Syracuse University iSchool
 
 ## Setup
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate    # Windows: .venv\Scripts\activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Phase 1: Load data
+## Run the full pipeline
 
 ```bash
-python -m pipeline.load_all
+python3 -m pipeline.load_all    # Phase 1: Load raw data into SQLite
+python3 -m pipeline.sites       # Phase 2: Build site hierarchy and cycle trails
+python3 -m pipeline.cycles      # Phase 3: Assemble canonical cycle model
+python3 -m analytics.pnl        # Phase 4: Compute P&L, hedge gains, anomalies
 ```
 
-This reads everything in `data/raw/` and creates `data/processed/proag.db`.
+## Run tests
+
+```bash
+python3 -m pytest tests/ -v
+```
+
+28 tests across 4 phases (4 + 4 + 6 + 14).
+
+## Phase 4 results
+
+- 14 closed cycles, 4 in-flight
+- Total revenue: $5,756,845
+- Total attributed costs: $722,146
+- Total hedge P&L: -$119,947
+- Total net P&L: $4,914,752
+- Average margin: $157.72/head
 
 ## Project structure
 
-- `pipeline/` — data ingestion and transformation
-- `analytics/` — P&L engine and metrics
-- `dashboard/` — Streamlit app
-- `data/raw/` — source files (do not edit)
-- `data/processed/` — generated SQLite database
+- `pipeline/` -- data ingestion and transformation (Phases 1-3)
+- `analytics/` -- P&L engine and metrics (Phase 4)
+- `dashboard/` -- Streamlit app (Phase 5, in progress)
+- `data/raw/` -- source files (do not edit)
+- `data/processed/` -- generated SQLite database
+- `tests/` -- smoke tests per phase
