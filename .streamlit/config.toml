@@ -1,0 +1,14 @@
+[theme]
+# ProAg forest-green identity
+primaryColor = "#2D5F3F"
+backgroundColor = "#FAFAF7"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#1A1A1A"
+font = "sans serif"
+
+[server]
+runOnSave = true
+headless = false
+
+[browser]
+gatherUsageStats = false
