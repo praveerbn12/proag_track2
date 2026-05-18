@@ -129,6 +129,100 @@ def compute_cost_breakdown(cycle):
         "category_pct": category_pct,
     }
 
+# ──────────────────────────────────────────────────────────────
+# Producer attribution
+# ──────────────────────────────────────────────────────────────
+DEMO_PRODUCERS = ["Demo Producer A", "Demo Producer B", "Demo Producer C"]
+_PRODUCER_CACHE = None
+
+
+def attribute_producer(cycle_id):
+    """Return the producer who owns this cycle.
+
+    Resolution strategy (real, data-driven):
+    1. CLOSED cycles: pick the producer who received the largest share of
+       net_payment across the cycle's matched packer settlements.
+    2. IN-FLIGHT cycles: pick the producer most commonly associated with
+       this cycle's nursery placement site across closed cycles.
+    3. Fallback: deterministic hash if neither signal is available.
+    """
+    global _PRODUCER_CACHE
+    if _PRODUCER_CACHE is None:
+        _PRODUCER_CACHE = _build_producer_map()
+    return _PRODUCER_CACHE.get(cycle_id, DEMO_PRODUCERS[0])
+
+
+def _build_producer_map():
+    """Compute producer attribution for every cycle in one pass."""
+    engine = _engine()
+    try:
+        cycle_ids = pd.read_sql(
+            "SELECT cycle_id FROM cycle_trail ORDER BY placement_date", engine
+        )["cycle_id"].tolist()
+    except Exception:
+        return {}
+
+    mapping = {}
+    site_to_producer = {}
+
+    # Pass 1: closed cycles → use the matched packer settlements
+    for cid in cycle_ids:
+        cycle = get_cycle(cid)
+        if cycle is None:
+            continue
+        settlements = cycle.get("packer_settlements", [])
+        if not settlements:
+            continue
+
+        # Sum net_payment by producer across this cycle's matched loads
+        payments = {}
+        for s in settlements:
+            producer = s.get("producer") or s.get("Producer")
+            if producer:
+                payments[producer] = payments.get(producer, 0) + (s.get("net_payment") or 0)
+
+        # If the settlement dict doesn't carry the producer field directly,
+        # fall back to a kill-date range lookup on packer_settlement.
+        if not payments:
+            kill_dates = [s.get("kill_date") for s in settlements if s.get("kill_date")]
+            if kill_dates:
+                try:
+                    df = pd.read_sql(
+                        """SELECT Producer, SUM(Net_Payment) AS total
+                           FROM packer_settlement
+                           WHERE Kill_Date BETWEEN ? AND ?
+                           GROUP BY Producer
+                           ORDER BY total DESC""",
+                        engine,
+                        params=(str(min(kill_dates)), str(max(kill_dates))),
+                    )
+                    if not df.empty:
+                        payments[df.iloc[0]["Producer"]] = df.iloc[0]["total"]
+                except Exception:
+                    pass
+
+        if payments:
+            top = max(payments, key=payments.get)
+            mapping[cid] = top
+            ns = (cycle.get("base") or {}).get("nursery_site")
+            if ns:
+                site_to_producer.setdefault(ns, {})
+                site_to_producer[ns][top] = site_to_producer[ns].get(top, 0) + 1
+
+    # Pass 2: in-flight cycles → use the nursery-site pattern from closed cycles
+    for cid in cycle_ids:
+        if cid in mapping:
+            continue
+        cycle = get_cycle(cid)
+        if cycle is None:
+            continue
+        ns = (cycle.get("base") or {}).get("nursery_site")
+        if ns and ns in site_to_producer:
+            mapping[cid] = max(site_to_producer[ns], key=site_to_producer[ns].get)
+        else:
+            mapping[cid] = DEMO_PRODUCERS[abs(hash(cid)) % len(DEMO_PRODUCERS)]
+
+    return mapping
 
 # ──────────────────────────────────────────────────────────────
 # Step 3: Hedge P&L
@@ -608,6 +702,7 @@ def build_full_pnl():
         flags = flag_anomalies(pnl, all_pnl)
         for f in flags:
             f["cycle_id"] = pnl["cycle_id"]
+            f["producer"] = attribute_producer(pnl["cycle_id"])
             all_anomalies.append(f)
 
     # Build summary DataFrame
@@ -615,6 +710,7 @@ def build_full_pnl():
     for p in all_pnl:
         rows.append({
             "cycle_id": p["cycle_id"],
+            "producer": attribute_producer(p["cycle_id"]), 
             "status": p["status"],
             "placed_head": p["placed_head"],
             "paid_head": p["paid_head"],

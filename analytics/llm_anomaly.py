@@ -132,6 +132,7 @@ def explain_all_anomalies():
 
         explanations.append({
             "cycle_id": row["cycle_id"],
+            "producer": row.get("producer"),
             "metric": row["metric"],
             "severity": row["severity"],
             "value": row.get("value"),

@@ -75,6 +75,7 @@ def summarize_all_cycles():
 
         summaries.append({
             "cycle_id": row["cycle_id"],
+            "producer": row.get("producer"), 
             "status": row["status"],
             "summary": summary,
         })
